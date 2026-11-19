@@ -35,12 +35,14 @@ local function argv(command)
   for word in read(out):gmatch("([^\n]*)\n") do words[#words + 1] = word end
   return words
 end
-local function arrives(command, message)
+local function arrives(command, message, host, dir)
   local words = argv(command)
-  assert(#words == 5, "expected 5 words, got " .. #words .. ": " .. command)
-  assert(words[1] == "do" and words[2] == lib.dir .. "send.lua", "script path changed: " .. tostring(words[2]))
-  assert(words[3] == "session=session:test" and words[4] == "block=block:b1")
-  assert(words[5] == "message=" .. message, "message changed: " .. tostring(words[5]))
+  local n = host and 5 or 4
+  assert(#words == n, "expected " .. n .. " words, got " .. #words .. ": " .. command)
+  assert(words[1] == "do" and words[2] == (dir or lib.dir) .. "send.lua", "script path changed: " .. tostring(words[2]))
+  assert(not host or words[3] == "host=" .. host, "host changed: " .. tostring(words[3]))
+  assert(words[n - 1] == "block=block:b1")
+  assert(words[n] == "message=" .. message, "message changed: " .. tostring(words[n]))
   assert(not io.open(canary), "the shell ran text from the command")
 end
 
@@ -61,21 +63,28 @@ local tricky = {
 }
 check("messages and script paths arrive literally through /bin/sh", function()
   for _, message in ipairs(tricky) do
-    arrives(lib.send_command("session:test", "block:b1", message), message)
+    arrives(lib.send_command("block:b1", message), message)
   end
 end)
 check("agents can fill in a placeholder by editing the command text", function()
   for _, placeholder in ipairs({ "<reply>", "<message>", "MESSAGE" }) do
-    local template = lib.send_command("session:test", "block:b1", placeholder)
+    local template = lib.send_command("block:b1", placeholder)
     local filled = template:gsub(placeholder:gsub("%p", "%%%0"), "Done, it'\\''s in /tmp/x $HOME")
     arrives(filled, "Done, it's in /tmp/x $HOME")
   end
 end)
 check("the reply command in a message header runs as written", function()
   lib.blocks = function() return { { id = "block:b1", tab = "it's `me` $HOME", pane = "", split = false } } end
-  local header = lib.header("session:test", "block:b1")
+  local header = lib.header(lib.whoami("session:test", "block:b1"), "Reply by running: " .. lib.send_command("block:b1", "<reply>"))
+  assert(header:find("[from it's `me` $HOME, who can't see this screen.", 1, true))
   local reply = assert(header:match("Reply by running: (.*)%] $"))
   arrives(reply, "<reply>")
+end)
+check("a command for another host and another machine's folder arrives literally", function()
+  local dir = root .. "/their $HOME's skills/"
+  for _, host in ipairs({ "studio", "https://studio.tail1234.ts.net", "it's `x` $(touch " .. canary .. ")" }) do
+    arrives(lib.send_command("block:b1", "<reply>", host, dir), "<reply>", host, dir)
+  end
 end)
 sh("rm -rf " .. quote(root))
 print("Passed " .. count .. " send command trials through /bin/sh.")

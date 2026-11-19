@@ -106,7 +106,7 @@ check("branch lookup failure is not called detached HEAD", function()
 end)
 
 local marker = "\226\128\139"
-local windows, processes, created, moves = {}, {}, {}, {}
+local windows, processes, created, moves, statuses = {}, {}, {}, {}, {}
 rex.layout = { block = function(value) return value end }
 rex.call = function(method, args)
   if method == "session.attach" then return {} end
@@ -114,6 +114,7 @@ rex.call = function(method, args)
   if method == "block.method" then
     if args.method == "list_dir" then return { status = "ok", path = args.args.path } end
     if args.method == "process" then return processes[args.block_id] end
+    if args.method == "program_status" then return { records = { statuses[args.block_id] } } end
   end
   if method == "session.new_window" then
     created[#created + 1] = args
@@ -193,13 +194,15 @@ check("team reads current branch and skips unavailable/nonterminal processes", f
     window("window:other", "Other", "block:other"),
   }
   processes["block:child"] = { foreground = { cwd = linked .. "/nested folder" } }
+  statuses["block:child"] = { state = "working", effective_app = "codex" }
   git(linked, "checkout", "-q", "-b", "agents/renamed")
   local output = run("team.lua")
   assert(output:find("branch: agents/renamed", 1, true))
   assert(output:find("worktree: " .. canonical, 1, true))
   assert(output:find("block='block:child'", 1, true))
-  assert(output:find("Other", 1, true))
-  assert(lib.header("session:test", "block:child"):find("fix-auth (w)", 1, true))
+  assert(output:find("↳ fix-auth (w)  (codex, working)  rex do", 1, true), "an agent's reported status follows its name")
+  assert(output:find("Other  rex do", 1, true), "a terminal that reports nothing gets no status")
+  assert(lib.whoami("session:test", "block:child"):find("fix-auth (w)", 1, true))
 end)
 check("team does not use stale cwd from the launch label", function()
   processes["block:child"] = { foreground = { cwd = repo } }

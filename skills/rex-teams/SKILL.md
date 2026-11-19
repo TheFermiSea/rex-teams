@@ -8,7 +8,7 @@ description: Work with other agents inside Rex. Start Claude, Codex, Pi, or othe
 - **Subagents** are agents you start for a task, in `↳` tabs next to yours. They report back, and you close them.
 - **Teammates** are agents the user set up, in the other labeled tabs and panes of your session. They stay open.
 
-The scripts are Lua files that Rex runs with `rex do`, so they work wherever Rex does. Arguments are `key=value` pairs. Messages go through `send.lua`. It types one line into the other agent's terminal, which starts that agent's next turn, so nobody polls. Messages to other agents start with a header naming the sender and the exact command for replying.
+The scripts are Lua files that Rex runs with `rex do`, so they work wherever Rex does. Arguments are `key=value` pairs. Messages go through `send.lua`. It types one line into the other agent's terminal, which starts that agent's next turn, so nobody polls. Messages to other agents start with a header naming the sender and the exact command for replying. Agents can be on other machines; see **Other hosts**.
 
 ## Subagents
 
@@ -65,6 +65,8 @@ If the child is still open, send it another task with the printed `send.lua` com
 
 Use the `message it:` command, not the `tab:` ID. A window ID can't receive messages. Lost it? Run `team.lua`.
 
+`send.lua` prints what happened: `delivered` once the agent started a turn on the message or queued it behind its current one, or `sent` for a terminal that reports no status. If it fails, read why in **When a message fails** before trying anything else.
+
 If you closed it, find the saved conversation that starts with its kickoff, `Read <task folder>/prompt.md and follow it.`, and work out that CLI's resume command. Write the follow-up to a new task file, then use spawn again:
 
 ```sh
@@ -77,11 +79,30 @@ Use the retained worktree as `cwd` when resuming work that needs its changes. Th
 
 Your teammates are the other labeled tabs and panes in your session, except tabs prefixed with a possibly indented `↳`, which are subagents. The user may also tell you about teammates elsewhere.
 
-List your team, then message a teammate by running the command printed next to its name, with your message in place of `<message>`. The command targets the teammate's block ID, because labels can change or repeat and IDs don't.
+List your team, then message a teammate by running the command printed next to its name, with your message in place of `<message>`. The command targets the teammate's block ID, because labels can change or repeat and IDs don't. After a name comes what that agent last reported, such as `(codex, working)` or `(claude-code, blocked)`. A terminal with no status may be a plain shell.
 
 ```sh
 rex do <skill>/scripts/team.lua
 ```
+
+### Other hosts
+
+Agents on another machine's Rex server are teammates too, when the user says so. `host=` names that server the way `rex -S` does: a label from `rex hosts`, or an address such as `https://studio.tail1234.ts.net`. Left out, it means this machine.
+
+```sh
+rex do <skill>/scripts/team.lua host=<host>                 # every session there; add session=<label> for one
+rex do <skill>/scripts/send.lua host=<host> block=<block ID> message='<message>'
+```
+
+`team.lua host=` prints the full `send.lua` command for each agent, as it does for your own session. The header of a message from another host carries a reply command written for the receiver's machine: its own path to this skill, and `host=` set to the way back to you. Run a reply command exactly as it is printed, whichever machine you are on.
+
+Rex reaches hosts one way at a time. If your message arrives but the header says it can't be answered, or the other agent's reply fails, the other machine can't use your Rex server. Tell the user; that is set up in Rex, not here. Subagents, task files and alarms stay on your own host: a path you send is only readable on the machine that wrote it.
+
+### When a message fails
+
+- `not sent: that agent is waiting for its user`: it has a question or permission prompt open, and typing would have answered it. `send.lua` already waited a minute (`wait=SECONDS` changes that). Try again later, or tell the user that agent needs them.
+- `pasted, but the agent didn't start a turn`: the text is probably sitting in its input box. Never send it again, or it arrives twice. Look with `rex capture`, or tell the user.
+- `Nothing happened: this machine can't use the Rex server`: the host is unknown, down, or refuses this machine. Don't retry; tell the user.
 
 Your session ID is `$REX_SESSION` (`$env:REX_SESSION` in PowerShell).
 
@@ -105,7 +126,7 @@ rex do <skill>/scripts/alarm.lua in=1200 message="Check in on the Marketer agent
 
 Use `in=SECONDS` once or `every=SECONDS` to repeat. The target defaults to you; pass `session=` and `block=` to target another agent. Save the printed alarm block ID, then **end your turn**.
 
-Keep the message to a short note to yourself, since you'll still have the conversation. Give a recurring alarm a stop condition, such as "check CI, and cancel this alarm once it's green".
+Keep the message to a short note to yourself, since you'll still have the conversation. An alarm is never typed into an agent that has a question or permission prompt open: it waits up to ten minutes for the prompt to go, then that alarm is skipped. Give a recurring alarm a stop condition, such as "check CI, and cancel this alarm once it's green".
 
 Cancel with `rex block close -s <session ID> <alarm block ID>`; list alarms with `rex block ls -s <session ID>`.
 

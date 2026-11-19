@@ -12,7 +12,7 @@ if not a.worker then
   local session, block = a.session or from_session, a.block or from_block
   local header = session == from_session and block == from_block
     and "[alarm you set] "
-    or lib.header(from_session, from_block)
+    or lib.header(lib.whoami(from_session, from_block), "Reply by running: " .. lib.send_command(from_block, "<reply>"))
   lib.attach(session)
   local alarm = lib.call("session.new_block", {
     session_id = session,
@@ -29,5 +29,9 @@ end
 lib.attach(a.session)
 local schedule = a.every and rex.every or rex.after
 schedule(seconds, function()
-  lib.paste_line(a.session, a.block, message)
+  -- submit won't type into a question or permission dialog, which Enter would
+  -- answer. An alarm can wait: give the dialog ten minutes to go, then skip
+  -- this one. A repeating alarm tries again at its next turn.
+  local ok, err = pcall(lib.submit, a.session, a.block, message, 600)
+  if not ok then print(os.date("%H:%M:%S ") .. tostring(err)) end
 end)

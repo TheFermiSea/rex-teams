@@ -35,6 +35,19 @@ Open agents in labeled tabs or panes, then talk to one:
 
 > Hi Chief, ask Marketer to create a launch video for my product. 
 
+### Across machines
+
+Agents on different Rex servers message each other with `host=`, which takes what `rex -S` takes: a label from `rex hosts` or a server address.
+
+> Ask the Codex agent on studio whether the migration has finished.
+
+```sh
+rex do <skill>/scripts/team.lua host=studio
+rex do <skill>/scripts/send.lua host=studio block=<block ID> message='<message>'
+```
+
+The skill has to be installed on both machines. Each message's header carries a reply command written for the receiving machine: that machine's path to the skill, and `host=` set to the receiver's own label for the sender, or else the sender's address. Reaching the other server, and being allowed in, is all Rex: the scripts run themselves again with `rex -S HOST`, with no relay or daemon. Replies need Rex to work in both directions, so each server must admit the other (with built-in Tailscale, both must allow tailnet members).
+
 ### Set alarms
 
 > Check in on the Marketer agent in 20 minutes.
@@ -43,7 +56,9 @@ Open agents in labeled tabs or panes, then talk to one:
 
 ## Limitations
 
-- If you're typing in a pane when a message lands, the message mixes into your draft.
+- If you're typing in a pane when a message lands, the message mixes into your draft. Rex doesn't expose a terminal's unsent input, so the scripts can't see a draft, and guessing from focus or the screen was too flaky to ship.
+- Delivery is checked through the status an agent reports to Rex (OSC 7501, which Claude Code and Codex send). A message is never typed into an agent that is blocked on a question or permission prompt, and a lost Enter is pressed once more. For a program that reports no status, or a message queued behind a running turn, nothing is checked.
+- Across machines, only messages and team listings travel. Subagents, task files and alarms stay on one host, and a reply needs the receiving machine to be allowed onto the sender's Rex server.
 - A subagent that crashes before reporting wakes nobody.
 - Alarms stop if the Rex server restarts.
 - Tested with Rex 0.1.0 (beta), Claude Code 2.1, Codex CLI 0.166, Pi 1.5 and OpenCode 2.2.
