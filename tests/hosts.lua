@@ -152,6 +152,34 @@ check("an unknown or ambiguous block fails with Rex's answer and types nothing",
   assert(#term.pastes == 0)
 end)
 
+-- Finding yourself. Older Rex servers set REX_SESSION and REX_BLOCK in a pane, newer ones only REX_BLOCK.
+local function me_in(env)
+  local real = os.getenv
+  os.getenv = function(name) return env[name] end
+  local result = { pcall(lib.me) }
+  os.getenv = real
+  return unpack(result)
+end
+check("a pane without REX_SESSION finds its session from its block", function()
+  resolve = { status = "resolved", target = { session_id = "session:mine", block_id = "block:mine" } }
+  for _, unset in ipairs({ false, "" }) do
+    local ok, session, block = me_in({ REX_SESSION = unset or nil, REX_BLOCK = "block:mine" })
+    assert(ok and session == "session:mine" and block == "block:mine", tostring(session))
+  end
+end)
+check("REX_SESSION is used as it is when Rex sets it", function()
+  resolve = { status = "not_found" }
+  local ok, session, block = me_in({ REX_SESSION = "session:given", REX_BLOCK = "block:mine" })
+  assert(ok and session == "session:given" and block == "block:mine", tostring(session))
+end)
+check("outside a Rex terminal, or in a pane Rex no longer knows, it says so", function()
+  local ok, err = me_in({})
+  assert(not ok and err:find("run this inside a Rex terminal", 1, true), tostring(err))
+  resolve = { status = "not_found" }
+  ok, err = me_in({ REX_BLOCK = "block:gone" })
+  assert(not ok and err:find("block block:gone is not found", 1, true), tostring(err))
+end)
+
 -- The way back (#31). These run as the receiver's server sees them.
 local function reply_of(a)
   lib.deliver(a)
