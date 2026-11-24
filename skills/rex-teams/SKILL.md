@@ -104,7 +104,7 @@ Rex reaches hosts one way at a time. If your message arrives but the header says
 - `pasted, but the agent didn't start a turn`: the text is probably sitting in its input box. Never send it again, or it arrives twice. Look with `rex capture`, or tell the user.
 - `Nothing happened: this machine can't use the Rex server`: the host is unknown, down, or refuses this machine. Don't retry; tell the user.
 
-Your session ID is `$REX_SESSION` (`$env:REX_SESSION` in PowerShell).
+Your session ID is `$REX_SESSION` (`$env:REX_SESSION` in PowerShell). Newer Rex versions set only `REX_BLOCK`; there, it is the `session_id` that `rex whoami --json` prints.
 
 A tab with one pane goes by its tab label. In a split tab, each pane goes by its own label.
 

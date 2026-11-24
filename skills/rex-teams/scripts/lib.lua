@@ -58,7 +58,11 @@ end
 
 -- The agent running this script.
 function lib.me()
-  return assert(os.getenv("REX_SESSION"), "run this inside a Rex terminal"), os.getenv("REX_BLOCK")
+  local block = assert(os.getenv("REX_BLOCK"), "run this inside a Rex terminal")
+  local session = os.getenv("REX_SESSION")
+  -- Newer Rex servers set only REX_BLOCK; a full block ID finds its session.
+  if not session or session == "" then session = lib.find(block) end
+  return session, block
 end
 
 -- A script must attach to a session before it can act on it.
